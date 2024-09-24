@@ -1,0 +1,118 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.26;
+
+
+contract Tips {
+    address owner;
+    uint public lastAliveTimestamp;
+    uint public distributeDelay = 1 days; // เวลา delay ก่อนที่จะสามารถกระจายทิปได้โดยใครก็ได้
+
+
+    Inheritor[] inheritors;
+
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+
+    // 1. หยอดเงินเข้าไปในกระปุก
+    function addTips() payable public {}
+
+
+    // 2. เช็คเงินในกระปุก
+    function viewTips() public view returns (uint) {
+        return address(this).balance;
+    }
+
+
+    // 3.1 add structure Inheritor
+    struct Inheritor {
+        address payable walletAddress;
+        string name;
+    }
+
+
+    // 3.2 add Inheritor
+    function addInheritor(address payable walletAddress, string memory name) public {
+        require(msg.sender == owner, "Only the owner can call this function");
+        bool inheritorExist = false;
+
+
+        if (inheritors.length >= 1) {
+            for (uint i = 0; i < inheritors.length; i++) {
+                if (inheritors[i].walletAddress == walletAddress) {
+                    inheritorExist = true;
+                }
+            }
+        }
+        if (!inheritorExist) {
+            inheritors.push(Inheritor(walletAddress, name));
+        }
+    }
+
+
+    // 4. remove Inheritor
+    function removeInheritor(address payable walletAddress) public {
+        require(msg.sender == owner, "Only the owner can call this function");
+        if (inheritors.length >= 1) {
+            for (uint i = 0; i < inheritors.length; i++) {
+                if (inheritors[i].walletAddress == walletAddress) {
+                    for (uint j = i; j < inheritors.length - 1; j++) {
+                        inheritors[j] = inheritors[j + 1];
+                    }
+                    inheritors.pop();
+                    break;
+                }
+            }
+        }
+    }
+
+
+    // 5. view Inheritors
+    function viewInheritors() public view returns (Inheritor[] memory) {
+        return inheritors;
+    }
+
+
+    // 6.1 distribute tips by owner
+    function distributeTipsByOwner() public {
+        require(msg.sender == owner, "Only the owner can call this function");
+        _distributeTips();
+    }
+
+
+    // 6.2 distribute tips by anyone (after time delay)
+    function distributeTipsByAnyone() public {
+        require(block.timestamp >= lastAliveTimestamp + distributeDelay, "Distribution not allowed yet");
+        _distributeTips();
+    }
+
+
+    // 7. Internal function to distribute tips
+    function _distributeTips() internal {
+        require(address(this).balance > 0, "Insufficient balance in the contract");
+        if (inheritors.length >= 1) {
+            uint amount = address(this).balance / inheritors.length;
+            for (uint i = 0; i < inheritors.length; i++) {
+                _transfer(inheritors[i].walletAddress, amount);
+            }
+        }
+    }
+
+
+    // 8. Transfer money
+    function _transfer(address payable walletAddress, uint amount) internal {
+        walletAddress.transfer(amount);
+    }
+
+
+    // 9. Keep Alive function to update the timestamp (only by owner)
+    function keepAlive() public {
+        require(msg.sender == owner, "Only the owner can call this function");
+        lastAliveTimestamp = block.timestamp;
+    }
+}
+
+
+
